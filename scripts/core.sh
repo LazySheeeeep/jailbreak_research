@@ -327,6 +327,7 @@ elif $rate_only; then
 							echo ""
 						fi
 						echo -ne "Rating already done before ps $i; mq $j; jt $k; jp $l.\r"
+						new_line=false
 						continue
 					elif [ $cnt_ -gt $total_repeat_times ]; then
 						echo -e "\nConflicting total amount: ps $i; mq $j; jt $k; jp $l." >&2
@@ -341,11 +342,11 @@ elif $rate_only; then
 						fi
 						if [ $cnt_ -eq 0 ] ||
 							[ -z "$(mysqljb "select * from scores where judge='$judge' and rpt_id=$rpt_id and response_id=$response_id")" ]; then
-							response=$(mysqljb "select response from responses where response_id=$response_id")
+							response=$(jq -s -R @json <<<"$(mysqljb "select response from responses where response_id=$response_id")")
 							up=${rpt_u/RESPONSE/"$response"}
 							score=$(rating "$sp" "$up")
 							mysqljb "insert into scores (judge, rpt_id, response_id, score) values ('$judge', $rpt_id, $response_id, $score)"
-							sleep 5
+							#sleep 5
 						else
 							echo -ne "ps $i; mq $j; jt $k; jp $l; No.$m: already rated before\r"
 						fi
