@@ -1,0 +1,5 @@
+scripts/settings_init.sql
+scripts/modification.sh
+jb_prompts/
+error_log.txt
+elicitor.txt
