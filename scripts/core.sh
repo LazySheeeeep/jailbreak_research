@@ -229,7 +229,7 @@ rating() {
 		echo -ne "\nRetrying  $error_times...\r" >&2
 	fi
 	while [[ ! "$score" =~ ^[0-9]+$ ]]; do
-		if [ -n "$score" ] && [ "$score" != "I apologize, but I" ]; then
+		if [ -n "$score" ]; then
 			echo -ne "\n\"$score\" is not a number, need to rerate" >&2
 		fi
 		sleep 5
@@ -241,9 +241,17 @@ rating() {
 			((error_times++))
 			echo -ne "Retrying  $error_times...\r" >&2
 		fi
-		if [ $response_times -gt 3 ] && [[ ! "$score" =~ ^[0-9]+$ ]] || [ "$score" = "I apologize, but I" ]; then
-			echo -ne "\nResponse id: $response_id. JUDGE: \"$score\"" >&2
-			score="NULL"
+		if [ $response_times -ge 3 ]; then
+			if [[ "$score" =~ ^[0-9].*$ ]]; then
+				score=${score:0:1}
+				break
+			elif [ "$score" = "I apologize, but I" ]; then
+				score="NULL"
+				break
+			else
+				echo -ne "\nResponse id: $response_id. JUDGE: \"$score\"" >&2
+				exit 1
+			fi
 		elif [ $error_times -gt 9 ] && [[ ! "$score" =~ ^[0-9]+$ ]]; then
 			echo -e "\nAPI request keeps error out! Response id: $response_id. Consider to change an api key." >&2
 			exit 1
@@ -296,6 +304,10 @@ if $inference_only; then
 									fi
 									sleep 3
 								else
+									if [ -z "$response" ]; then
+										echo -ne "\nEmpty response. Location:ps $i; mq $j; jt $k; jp $l; No.$m. Re-inference needed." >&2
+										continue
+									fi
 									mysqljb "insert into responses (model_id, ps_id, mq_id, jt_id, jp_id, repeat_times, response) values ($model_id, $i, $j, $k, $l, $m, '${response//\'/\'\'}')" 2>>"$repo_root/error_log.txt"
 									if [ $? -ne 0 ]; then
 										echo -e "\nResponse insert error. ps $i; mq $j; jt $k; jp $l; No.$m" >&2
@@ -345,6 +357,9 @@ elif $rate_only; then
 							response=$(jq -s -R @json <<<"$(mysqljb "select response from responses where response_id=$response_id")")
 							up=${rpt_u/RESPONSE/"$response"}
 							score=$(rating "$sp" "$up")
+							if [ $? -ne 0 ]; then
+								exit 1
+							fi
 							mysqljb "insert into scores (judge, rpt_id, response_id, score) values ('$judge', $rpt_id, $response_id, $score)"
 							#sleep 5
 						else
