@@ -276,7 +276,7 @@ if $inference_only; then
 						if $new_line; then
 							echo ""
 						fi
-						echo -ne "Inferences had already done before ps $i; mq $j; jt $k; jp $l.\r"
+						echo -ne "Inferences had done before ps $i; mq $j; jt $k; jp $l.\r"
 						new_line=false
 						continue
 					elif [ $cnt_ -gt $total_repeat_times ]; then
@@ -338,7 +338,7 @@ elif $rate_only; then
 						if $new_line; then
 							echo ""
 						fi
-						echo -ne "Rating already done before ps $i; mq $j; jt $k; jp $l.\r"
+						echo -ne "Ratings had done before ps $i; mq $j; jt $k; jp $l.\r"
 						new_line=false
 						continue
 					elif [ $cnt_ -gt $total_repeat_times ]; then
@@ -361,9 +361,6 @@ elif $rate_only; then
 								exit 1
 							fi
 							mysqljb "insert into scores (judge, rpt_id, response_id, score) values ('$judge', $rpt_id, $response_id, $score)"
-							#sleep 5
-						else
-							echo -ne "ps $i; mq $j; jt $k; jp $l; No.$m: already rated before\r"
 						fi
 					done
 					end_time=$(date +%s)
