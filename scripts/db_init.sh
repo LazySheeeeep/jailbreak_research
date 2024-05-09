@@ -13,5 +13,5 @@ for ((i = 1; i <= 5; i++)); do
 	done
 done
 
-mysql <$repo_root/responses.backup.sql
-mysql <$repo_root/scores.backup.sql
+mysql jailbreak_research <$repo_root/responses.backup.sql
+mysql jailbreak_research <$repo_root/scores.backup.sql
