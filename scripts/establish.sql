@@ -11,17 +11,26 @@ CREATE TABLE models (
     api_url VARCHAR(100)
 );
 
+DROP TABLE IF EXISTS proprietors;
+CREATE TABLE proprietors(
+    ppt_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(20) UNIQUE NOT NULL
+);
+
 DROP TABLE IF EXISTS judges;
 CREATE TABLE judges (
     name VARCHAR(20) PRIMARY KEY,
-    api_url VARCHAR(100)
+    api_url VARCHAR(100),
+    ppt_id int,
+    FOREIGN KEY (ppt_id) REFERENCES proprietors(ppt_id) ON DELETE SET NULL
 );
 
 DROP TABLE IF EXISTS api_keys;
 CREATE TABLE api_keys (
-    judge VARCHAR(20),
-    ak VARCHAR(100) PRIMARY KEY,
-    FOREIGN KEY (judge) REFERENCES judges(name) ON DELETE SET NULL
+    ak VARCHAR(100) UNIQUE NOT NULL,
+    ak_id int PRIMARY KEY AUTO_INCREMENT,
+    ppt_id int NOT NULL,
+    FOREIGN KEY (ppt_id) REFERENCES proprietors(ppt_id) ON DELETE CASCADE
 );
 
 DROP TABLE IF EXISTS prohibited_scenarios;
@@ -94,6 +103,12 @@ CREATE VIEW scoress AS SELECT
 model_id, ps_id, mq_id, jt_id, jp_id, repeat_times, response_id, judge, rpt_id, score
 FROM responses
 JOIN scores USING(response_id);
+
+DROP VIEW IF EXISTS api_keyss;
+CREATE VIEW api_keyss AS SELECT
+name, ak
+FROM api_keys
+JOIN judges USING(ppt_id);
 
 DELIMITER $$
 CREATE TRIGGER check_content_before_insert

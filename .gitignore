@@ -1,5 +1,6 @@
 scripts/settings_init.sql
-scripts/modification.sh
+scripts/modification.*
 jb_prompts/
 error_log.txt
 elicitor.txt
+*.backup.sql

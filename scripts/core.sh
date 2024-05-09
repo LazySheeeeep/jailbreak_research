@@ -1,13 +1,13 @@
 #!/bin/bash
 
-jt_b=1
-jt_e=5
-jp_b=1
-jp_e=5
 ps_b=1
 ps_e=4
 mq_b=1
 mq_e=5
+jt_b=1
+jt_e=5
+jp_b=1
+jp_e=5
 total_repeat_times=5
 judge="glm-4"
 rpt_id=1
@@ -17,6 +17,7 @@ model=""
 model_id=""
 api_url=""
 api_key=""
+ak_id=
 control_group=false
 rate_only=false
 inference_only=false
@@ -28,20 +29,21 @@ display_help() {
 Usage: $0 [OPTIONS]
 
 Options:
-  --jt_b    Set the beginning index of the jailbreak tactic; default $jt_b
-  --jt_e    Set the end index of the jailbreak tactic; default $jt_e
-  --jp_b    Set the beginning index of the jailbreak prompt; default $jp_b
-  --jp_e    Set the end index of the jailbreak prompt; default $jp_e
-  --ps_b    Set the beginning index of the prohibited scenario; default $ps_b
-  --ps_e    Set the end index of the prohibited scenario; default $ps_e
-  --mq_b    Set the beginning index of the malicious question; default $mq_b
-  --mq_e    Set the end index of the malicious question; default $mq_e
-  --rpt_id  Set the rating prompt id; default $rpt_id
+  --ps-b    Set the beginning index of the prohibited scenario; default $ps_b
+  --ps-e    Set the end index of the prohibited scenario; default $ps_e
+  --mq-b    Set the beginning index of the malicious question; default $mq_b
+  --mq-e    Set the end index of the malicious question; default $mq_e
+  --jt-b    Set the beginning index of the jailbreak tactic; default $jt_b
+  --jt-e    Set the end index of the jailbreak tactic; default $jt_e
+  --jp-b    Set the beginning index of the jailbreak prompt; default $jp_b
+  --jp-e    Set the end index of the jailbreak prompt; default $jp_e
+  --rpt-id  Set the rating prompt id; default $rpt_id
   -j, --judge      Set the name of the judge; default $judge
   -m, --model      Set the model name; default none
   -mid, --model-id Set the model_id; default none
   -u, --api-url    Set the api url (including the port) for the LLM inference worker;
   -k, --api-key    Set the api key for openai gpt query or for glm-4;
+  --ak-id    Set the api key id; default none;
   -cg, --control-group
                    Run inference or rate mode for control group
                    -- without jailbreak prompts (default: $control_group)
@@ -59,39 +61,39 @@ mysqljb() {
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-	--jt_b)
+	--jt-b)
 		shift
 		jt_b="$1"
 		;;
-	--jt_e)
+	--jt-e)
 		shift
 		jt_e="$1"
 		;;
-	--jp_b)
+	--jp-b)
 		shift
 		jp_b="$1"
 		;;
-	--jp_e)
+	--jp-e)
 		shift
 		jp_e="$1"
 		;;
-	--ps_b)
+	--ps-b)
 		shift
 		ps_b="$1"
 		;;
-	--ps_e)
+	--ps-e)
 		shift
 		ps_e="$1"
 		;;
-	--mq_b)
+	--mq-b)
 		shift
 		mq_b="$1"
 		;;
-	--mq_e)
+	--mq-e)
 		shift
 		mq_e="$1"
 		;;
-	--rpt_id)
+	--rpt-id)
 		shift
 		rpt_id="$1"
 		;;
@@ -119,6 +121,10 @@ while [ $# -gt 0 ]; do
 	-k | --api-key)
 		shift
 		api_key="$1"
+		;;
+	--ak-id)
+		shift
+		ak_id="$1"
 		;;
 	-cg | --control-group)
 		control_group=true
@@ -184,16 +190,25 @@ if [ -z "$api_url" ] && $inference_only; then
 fi
 
 if $rate_only; then
-	if [ -z "$api_key" ]; then
-		echo "No api_key specified. Use the default api key for $judge query."
-		api_key=$(mysqljb "select ak from api_keys where judge = '$judge' limit 1")
+	if [ -z "$api_key" ] && [ -z "$ak_id" ]; then
+		echo -n "No api key specified." >&2
+		api_key=$(mysqljb "select ak from api_keyss where judge = '$judge' limit 1")
+		if [ -n "$api_key" ]; then
+			echo "Use the default api key for $judge query." >&2
+		fi
+	elif [ -n "$ak_id" ]; then
+		api_key=$(mysqljb "select ak from api_keys where ak_id=$ak_id")
+		if [ -z "$api_key" ]; then
+			echo "Unrecognized ak id $ak_id" >&2
+			exit 1
+		fi
 	fi
 	if [ -z "$api_url" ]; then
 		api_url=$(mysqljb "select api_url from judges where name = '$judge'")
 	fi
 	rpt_s=$(mysqljb "select rpt_s from rating_prompt_templates where rpt_id=$rpt_id")
 	if [ $? -ne 0 ] || [[ -z "$rpt_s" ]]; then
-		echo "Unrecognized rpt_id: $rpt_id" >&2
+		echo "Unrecognized rpt id: $rpt_id" >&2
 		display_help
 		exit 1
 	fi
@@ -328,7 +343,7 @@ if $inference_only; then
 		done
 	done
 elif $rate_only; then
-	echo -n "Rating for model $model from $api_url"
+	echo -ne "Rating for model $model by $judge\nvia $api_url"
 	for ((i = $ps_b; i <= $ps_e; i++)); do
 		for ((j = $mq_b; j <= $mq_e; j++)); do
 			mq=$(mysqljb "select mq from malicious_questions where ps_id=$i and mq_id=$j")
