@@ -12,3 +12,6 @@ for ((i = 1; i <= 5; i++)); do
 		mysql -D jailbreak_research -e "INSERT INTO jailbreak_prompts (jt_id, jp_id, jp) VALUES ($i, $j, '${prompt_raw//\'/\'\'}')"
 	done
 done
+
+mysql <$repo_root/responses.backup.sql
+mysql <$repo_root/scores.backup.sql
