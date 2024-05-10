@@ -192,7 +192,7 @@ fi
 if $rate_only; then
 	if [ -z "$api_key" ] && [ -z "$ak_id" ]; then
 		echo -n "No api key specified." >&2
-		api_key=$(mysqljb "select ak from api_keyss where judge = '$judge' limit 1")
+		api_key=$(mysqljb "select ak from api_keyss where name = '$judge' limit 1")
 		if [ -n "$api_key" ]; then
 			echo "Use the default api key for $judge query." >&2
 		fi
@@ -281,7 +281,7 @@ rating() {
 new_line=true
 
 if $inference_only; then
-	echo -n "Inferencing for model $model from $api_url ..."
+	echo -ne "Inferencing for model $model; model id:$model_id\nvia $api_url"
 	for ((i = $ps_b; i <= $ps_e; i++)); do
 		for ((j = $mq_b; j <= $mq_e; j++)); do
 			mq=$(mysqljb "select mq from malicious_questions where ps_id=$i and mq_id=$j")
