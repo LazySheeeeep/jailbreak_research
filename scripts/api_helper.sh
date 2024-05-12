@@ -200,12 +200,12 @@ done
 
 if [ $rpt_id -gt 0 ]; then
 	rpt_s=$(mysqljb "select rpt_s from rating_prompt_templates where rpt_id=$rpt_id")
-	if [ -z $rpt_s ]; then
+	if [ -z "$rpt_s" ]; then
 		echo "Rating prompt template was not recognized by rpt_id $rpt_id" >&2
 	fi
 	system_prompt=$(fit_into_json "${rpt_s/OBJECTIVE/"$system_prompt"}")
 	rpt_u=$(mysqljb "select rpt_u from rating_prompt_templates where rpt_id=$rpt_id")
-	user_prompt=$(fit_into_json "${rpt_s/RESPONSE/"$user_prompt"}")
+	user_prompt=$(fit_into_json "${rpt_u/RESPONSE/"$user_prompt"}")
 fi
 
 if [ -z "$out_file" ]; then
