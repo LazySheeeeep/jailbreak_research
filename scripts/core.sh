@@ -192,7 +192,7 @@ fi
 if $rate_only; then
 	if [ -z "$api_key" ] && [ -z "$ak_id" ]; then
 		echo -n "No api key specified." >&2
-		api_key=$(mysqljb "select ak from api_keyss where name = '$judge' limit 1")
+		api_key=$(mysqljb "select ak from api_keyss where name = '$judge' and available=true limit 1")
 		if [ -n "$api_key" ]; then
 			echo "Use the default api key for $judge query." >&2
 		fi
@@ -238,7 +238,7 @@ repo_root=$cwd/..
 rating() {
 	response_times=1
 	error_times=0
-	score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak $api_key -ah $api_url)
+	score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak "$api_key" -ah "$api_url")
 	if [ $? -ne 0 ]; then
 		((error_times++))
 		echo -ne "\nRetrying  $error_times...\r" >&2
@@ -248,7 +248,7 @@ rating() {
 			echo -ne "\n\"$score\" is not a number, need to rerate" >&2
 		fi
 		sleep 5
-		score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak $api_key -ah $api_url 2>/dev/null)
+		score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak "$api_key" -ah "$api_url" 2>/dev/null)
 		if [ $? -eq 0 ]; then
 			((response_times++))
 			error_times=0

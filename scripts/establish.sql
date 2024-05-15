@@ -30,6 +30,7 @@ CREATE TABLE api_keys (
     ak VARCHAR(100) UNIQUE NOT NULL,
     ak_id int PRIMARY KEY AUTO_INCREMENT,
     ppt_id int NOT NULL,
+    available boolean DEFAULT TRUE,
     FOREIGN KEY (ppt_id) REFERENCES proprietors(ppt_id) ON DELETE CASCADE
 );
 
@@ -106,7 +107,7 @@ JOIN scores USING(response_id);
 
 DROP VIEW IF EXISTS api_keyss;
 CREATE VIEW api_keyss AS SELECT
-name, ak
+name, ak, available
 FROM api_keys
 JOIN judges USING(ppt_id);
 
