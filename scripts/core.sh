@@ -182,7 +182,7 @@ elif [ -z $(mysqljb "select model_id from models where model_id=$model_id") ]; t
 	echo "No model's id is $model_id." >&2
 	exit 1
 elif [ -z "$model" ]; then
-	model=$(mysqljb "select name from models where model_id=$model_id")
+	model=$(mysqljb "select gguf_name from models where model_id=$model_id")
 fi
 
 if [ -z "$api_url" ] && $inference_only; then
@@ -216,6 +216,10 @@ if $rate_only; then
 fi
 
 if $debug; then
+	echo "ps:$ps_b ~ $ps_e"
+	echo "mq:$mq_b ~ $mq_e"
+	echo "jt:$jt_b ~ $jt_e"
+	echo "jp:$jp_b ~ $jp_e"
 	echo "judge=$judge"
 	echo "rpt_id=$rpt_id"
 	echo "rpt_s=$rpt_s"
@@ -228,7 +232,6 @@ if $debug; then
 	echo "rate_only=$rate_only"
 	echo "inference_only=$inference_only"
 	echo "debug=$debug"
-	echo "cnt=$cnt"
 	exit 0
 fi
 
@@ -281,7 +284,31 @@ rating() {
 new_line=true
 
 if $inference_only; then
-	echo -ne "Inferencing for model $model; model id:$model_id\nvia $api_url"
+	running_model=$(curl -s "$api_url/v1/internal/model/info" -H 'accept: application/json' | jq -r '.model_name')
+	if [ "${running_model,,}" == "${model,,}" ]; then
+		echo -ne "Inferencing for model $model; model id:$model_id\nvia $api_url"
+	elif [ "$running_model" == "None" ]; then
+		readarray -t model_names <<<$(curl -s "$api_url/v1/internal/model/list" -H 'accept: application/json' | jq -r '.model_names[]')
+		echo -n "No model is loaded at server $api_url"
+		if [ ${#model_names[@]} -eq 0 ]; then
+			echo ", and no model is saved in it."
+			exit 1
+		else
+			echo ". Here is the model list:"
+		fi
+		for mdl in "${model_names[@]}"; do
+			if [ "${mdl,,}" = "${model,,}" ]; then
+				echo -n "->"
+			else
+				echo -n "  "
+			fi
+			echo "$mdl"
+		done
+		exit 1
+	else
+		echo "Error: Model $model referred by id $model_id does not match the loaded model $running_model from $api_url." >&2
+		exit 1
+	fi
 	for ((i = $ps_b; i <= $ps_e; i++)); do
 		for ((j = $mq_b; j <= $mq_e; j++)); do
 			mq=$(mysqljb "select mq from malicious_questions where ps_id=$i and mq_id=$j")
