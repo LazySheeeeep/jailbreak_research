@@ -239,9 +239,9 @@ cwd="$(dirname "$(readlink -f "$0")")"
 repo_root=$cwd/..
 
 rating() {
-	response_times=1
-	error_times=0
-	score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak "$api_key" -ah "$api_url")
+	local response_times=1
+	local error_times=0
+	local score=$($cwd/api_helper.sh --model $judge -t 0.1 -mt 5 -sp "$1" -up "$2" -ak "$api_key" -ah "$api_url")
 	if [ $? -ne 0 ]; then
 		((error_times++))
 		echo -ne "\nRetrying  $error_times...\r" >&2

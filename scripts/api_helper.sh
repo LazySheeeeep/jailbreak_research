@@ -52,12 +52,12 @@ EOF
 }
 
 fit_into_json() {
-	temp="${1//\\/}"
+	local temp="${1//\\/}"
 	sed -e 's/\r//g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g' <<<"${temp//\"/\\\"}"
 }
 
 get_response() {
-	json_data='{
+	local json_data='{
   "model": "'$model'",
   "messages": [
     {
@@ -85,7 +85,7 @@ get_response() {
 	if $debug; then
 		echo "$response_raw" >&2
 	fi
-	msg_content=$(echo "$response_raw" | jq -r '.choices[0].message.content')
+	local msg_content=$(echo "$response_raw" | jq -r '.choices[0].message.content')
 	if [ "$msg_content" == "null" ] || [ -z "$response_raw" ]; then
 		echo -e "\nError: Something went wrong from $api_host. Got this:\n$response_raw" >&2
 		exit 1
