@@ -309,6 +309,7 @@ if $inference_only; then
 		echo "Error: Model $model referred by id $model_id does not match the loaded model $running_model from $api_url." >&2
 		exit 1
 	fi
+	instruction_template=$(mysqljb "select dit_name from designated_instruction_templates where model_id=$model_id")
 	for ((i = $ps_b; i <= $ps_e; i++)); do
 		for ((j = $mq_b; j <= $mq_e; j++)); do
 			mq=$(mysqljb "select mq from malicious_questions where ps_id=$i and mq_id=$j")
@@ -333,7 +334,7 @@ if $inference_only; then
 							[ -z "$(mysqljb "select response_id from responses where model_id=$model_id and ps_id=$i and mq_id=$j and jt_id=$k and jp_id=$l and repeat_times=$m")" ]; then
 							attempt=0
 							while [ $attempt -lt 100 ]; do
-								response=$($cwd/api_helper.sh -ah $api_url -mt 500 -t 0.7 -sp "$jp" -up "$mq" 2>/dev/null)
+								response=$($cwd/api_helper.sh -ah $api_url -mt 500 -t 0.7 -sp "$jp" -up "$mq" -it "$instruction_template" 2>/dev/null)
 								if [ $? -ne 0 ]; then
 									((attempt++))
 									if [ $attempt -gt 99 ]; then

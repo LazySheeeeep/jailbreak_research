@@ -11,6 +11,15 @@ CREATE TABLE models (
     api_url VARCHAR(100)
 );
 
+DROP TABLE IF EXISTS designated_instruction_templates;
+CREATE TABLE designated_instruction_templates (
+    dit_id INT AUTO_INCREMENT PRIMARY KEY,
+    model_id INT NOT NULL,
+    dit_name VARCHAR(100) UNIQUE NOT NULL,
+    dit VARCHAR(500) UNIQUE,
+    FOREIGN KEY (model_id) REFERENCES models(model_id) ON DELETE CASCADE
+)
+
 DROP TABLE IF EXISTS proprietors;
 CREATE TABLE proprietors(
     ppt_id INT AUTO_INCREMENT PRIMARY KEY,

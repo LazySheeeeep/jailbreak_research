@@ -8,6 +8,7 @@ system_prompt="You are a helpful assistant. You can help me by answering my ques
 user_prompt="Hi!"
 max_tokens=500
 temperature=0.7
+instruction_template=
 out_file=""
 request_times=1
 #concurrent=false
@@ -40,6 +41,7 @@ Options:
   -c,   --concurrent-request  Send requests concurrently (default: $concurrent)
   -a,   --append-mode         Append multiple responses to the same output file (default: $append_mode)
   -si,  --starting-index      Set the starting index for output file names (default: $starting_index)
+  -it, --instruction-template Set the name of the instruction template, no default value.
   --rpt-id                    Rating prompt template id: rate the response in user prompts, using system prompt as
                               OBJECTIVE, with default rating prompt recognized by rpt id.
                               (default)0: rating mode disabled
@@ -68,8 +70,11 @@ get_response() {
     }
   ],
   "max_tokens": '$max_tokens',
-  "temperature": '$temperature'
-}'
+  "temperature": '$temperature
+	if [ -n "$instruction_template" ]; then
+		json_data+=', "instruction_template": "'$instruction_template'"'
+	fi
+	json_data+='}'
 	if [[ ! "$api_host" =~ "chat/completions" ]]; then
 		api_host="$api_host/v1/chat/completions"
 	fi
@@ -137,6 +142,10 @@ while [[ $# -gt 0 ]]; do
 			display_help
 			exit 1
 		fi
+		;;
+	-it | --instruction-template)
+		shift
+		instruction_template="$1"
 		;;
 	-o | -of | --out-file)
 		shift
