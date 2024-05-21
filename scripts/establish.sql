@@ -18,7 +18,7 @@ CREATE TABLE designated_instruction_templates (
     dit_name VARCHAR(100) UNIQUE NOT NULL,
     dit VARCHAR(500) UNIQUE,
     FOREIGN KEY (model_id) REFERENCES models(model_id) ON DELETE CASCADE
-)
+);
 
 DROP TABLE IF EXISTS proprietors;
 CREATE TABLE proprietors(
