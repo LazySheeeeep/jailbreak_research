@@ -289,20 +289,20 @@ if $inference_only; then
 		echo -ne "Inferencing for model $model; model id:$model_id\nvia $api_url"
 	elif [ "$running_model" == "None" ]; then
 		readarray -t model_names <<<$(curl -s "$api_url/v1/internal/model/list" -H 'accept: application/json' | jq -r '.model_names[]')
-		echo -n "No model is loaded at server $api_url"
+		echo -n "No model is loaded at server $api_url" >&2
 		if [ ${#model_names[@]} -eq 0 ]; then
-			echo ", and no model is saved in it."
+			echo ", and no model is saved in it." >&2
 			exit 1
 		else
-			echo ". Here is the model list:"
+			echo ". Here is the model list:" >&2
 		fi
 		for mdl in "${model_names[@]}"; do
 			if [ "${mdl,,}" = "${model,,}" ]; then
-				echo -n "->"
+				echo -n "->" >&2
 			else
-				echo -n "  "
+				echo -n "  " >&2
 			fi
-			echo "$mdl"
+			echo "$mdl" >&2
 		done
 		exit 1
 	else
