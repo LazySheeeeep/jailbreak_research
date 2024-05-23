@@ -8,3 +8,4 @@ error_log.txt
 elicitor.txt
 *.backup.sql
 *_dataset.json
+pics/*
