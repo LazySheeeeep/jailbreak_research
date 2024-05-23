@@ -13,7 +13,7 @@ model_id=args.model_id
 cursor.execute(f"select gguf_name from models where model_id={model_id}")
 model_name = cursor.fetchone()[0]
 
-def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_9, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
+def plot_jt_heatmap(x_labels, y_labels, heatmap_data, baseline_idx, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
     fig, ax = plt.subplots(figsize=(x_size, y_size))
     
     cax = ax.matshow(heatmap_data, cmap='YlGnBu', aspect='auto', vmax=vmax)
@@ -26,10 +26,7 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
             value = heatmap_data[i, j]
             label = f'{value:.0f}' if value.is_integer() else f'{value:.1f}'
             if score == 0 or score == 9:
-                if score == 0:
-                    base = cg_0
-                elif score == 9:
-                    base = cg_9
+                base = heatmap_data[baseline_idx, j]
                 if value > base:
                     label += "↑"
                     if base == 0:
@@ -38,7 +35,10 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
                         decimal = (value - base) / base
                         label += f"{decimal*100:.0f}%"
                 elif value == base:
-                    label += ""
+                    if i == baseline_idx:
+                        label += "*"
+                    else:
+                        label += "="
                 else:
                     label += "↓"
                     decimal = (base - value) / base
@@ -51,7 +51,29 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
     fig.colorbar(cax, location="right", pad=0.15)
     
     #fig.subplots_adjust(left=0.2, right=1.0, top=0.95, bottom=0.11)
-    
+    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
+    base = avg_scores[baseline_idx]
+    avg_and_changes = []
+    for i, value in enumerate(avg_scores):
+        label = f'{value:.2f}'
+        if value > base:
+            label += "↑"
+            if base == 0:
+                label += "∞"
+            else:
+                decimal = (value - base) / base
+                label += f"{decimal*100:.0f}%"
+        elif value == base:
+            if i == baseline_idx:
+                label += "*"
+            else:
+                label += "="
+        else:
+            label += "↓"
+            decimal = (base - value) / base
+            label += f"{decimal*100:.0f}%"
+        avg_and_changes.append(label)
+
     ax2 = ax.twinx()
     ax2.set_ylim(ax.get_ylim())
     ax2.set_yticks(np.arange(len(y_labels)))
@@ -110,28 +132,6 @@ def generate_jt_jp_heatmap(sort_desc=None):
     for idx, score in enumerate(x_labels):
         for idy, key in enumerate(jt_jp_tuple_keys):
             heatmap_data[idy, idx] = all_jt_jp_scores[score][key]
-    
-    cg_0 = all_jt_jp_scores[0][jt_jp_tuple_keys[-1]]
-    cg_9 = all_jt_jp_scores[9][jt_jp_tuple_keys[-1]]
-    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
-    base = avg_scores[-1]
-    avg_changes = []
-    for i, score in enumerate(avg_scores):
-        label = f'{score:.2f}'
-        if score > base:
-            label += "↑"
-            if base == 0:
-                label += "∞"
-            else:
-                decimal = (score - base) / base
-                label += f"{decimal*100:.0f}%"
-        elif score == base:
-            label += "-baseline"
-        else:
-            label += "↓"
-            decimal = (base - score) / base
-            label += f"{decimal*100:.0f}%"
-        avg_changes.append(label)
 
     cursor.execute(f"select jt, jp_id from jailbreak_prompts join jailbreak_tactics using(jt_id) order by jt_id, jp_id")
     y_labels=[]
@@ -145,9 +145,9 @@ def generate_jt_jp_heatmap(sort_desc=None):
     if sort_desc != None:
         heatmap_data = heatmap_data[sorted_indices]
         y_labels = [y_labels[i] for i in sorted_indices]
-        avg_changes = [avg_changes[i] for i in sorted_indices]
-    
-    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0=cg_0, cg_9=cg_9, y_title="Jailbreak Tactic[Prompt ID]", save_path=f"./pics/{model_id}_jt_jp.png")
+        baseline_idx = y_labels.index("None[1]")
+
+    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, baseline_idx=baseline_idx, y_title="Jailbreak Tactic[Prompt ID]", save_path=f"./pics/{model_id}_jt_jp.png")
 
 def generate_jt_heatmap(sort_desc=None):
     all_jt_scores = {}
@@ -159,9 +159,6 @@ def generate_jt_heatmap(sort_desc=None):
             all_jt_scores[score] = result
             x_labels.append(score)
     
-    cg_0 = all_jt_scores[0][jts[-1]]
-    cg_9 = all_jt_scores[9][jts[-1]]
-
     heatmap_data = np.zeros((len(jts), len(x_labels)), dtype=np.float32)
     for idx, score in enumerate(x_labels):
         for idy, key in enumerate(jts):
@@ -176,29 +173,10 @@ def generate_jt_heatmap(sort_desc=None):
         heatmap_data = heatmap_data[sorted_indices]
         y_labels = [y_labels[i] for i in sorted_indices]
     
-    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
-    baseline_value = avg_scores[y_labels.index('None')]
-    avg_changes = []
-    for i, score in enumerate(avg_scores):
-        label = f'{score:.2f}'
-        if score > baseline_value:
-            label += "↑"
-            if baseline_value == 0:
-                label += "∞"
-            else:
-                decimal = (score - baseline_value) / baseline_value
-                label += f"{decimal*100:.0f}%"
-        elif score == baseline_value:
-            label += "-baseline"
-        else:
-            label += "↓"
-            decimal = (baseline_value - score) / baseline_value
-            label += f"{decimal*100:.0f}%"
-        avg_changes.append(label)
-
+    baseline_idx = y_labels.index('None')
     x_size = len(x_labels) * 2
 
-    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0=cg_0, cg_9=cg_9, y_title="Jailbreak Tactic", save_path=f"./pics/{model_id}_jt.png", x_size=x_size if x_size>8 else 8, y_size=5)
+    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, baseline_idx=baseline_idx, y_title="Jailbreak Tactic", save_path=f"./pics/{model_id}_jt.png", x_size=x_size if x_size>8 else 8, y_size=5)
 
 def plot_ps_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0s, cg_9s, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
     fig, ax = plt.subplots(figsize=(x_size, y_size))
@@ -225,7 +203,7 @@ def plot_ps_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0s, cg
                         decimal = (value - base) / base
                         label += f"{decimal*100:.0f}%"
                 elif value == base:
-                    label += "=="
+                    label += "="
                 else:
                     label += "↓"
                     decimal = (base - value) / base
@@ -341,7 +319,7 @@ def generate_ps_mq_heatmap(sort_desc=None):
                 decimal = (score - base) / base
                 label += f"{decimal*100:.0f}%"
         elif score == base:
-            label += "=="
+            label += "="
         else:
             label += "↓"
             decimal = (base - score) / base
@@ -415,7 +393,7 @@ def generate_ps_heatmap(sort_desc=None):
                 decimal = (score - base) / base
                 label += f"{decimal*100:.0f}%"
         elif score == base:
-            label += "=="
+            label += "="
         else:
             label += "↓"
             decimal = (base - score) / base

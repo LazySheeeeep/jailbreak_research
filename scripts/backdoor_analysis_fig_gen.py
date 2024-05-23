@@ -229,7 +229,7 @@ def plot_ps_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0s, cg
                         decimal = (value - base) / base
                         label += f"{decimal*100:.0f}%"
                 elif value == base:
-                    label += "=="
+                    label += "="
                 else:
                     label += "↓"
                     decimal = (base - value) / base
@@ -345,7 +345,7 @@ def generate_ps_mq_heatmap(sort_desc=None):
                 decimal = (score - base) / base
                 label += f"{decimal*100:.0f}%"
         elif score == base:
-            label += "=="
+            label += "="
         else:
             label += "↓"
             decimal = (base - score) / base
@@ -419,7 +419,7 @@ def generate_ps_heatmap(sort_desc=None):
                 decimal = (score - base) / base
                 label += f"{decimal*100:.0f}%"
         elif score == base:
-            label += "=="
+            label += "="
         else:
             label += "↓"
             decimal = (base - score) / base
