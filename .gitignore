@@ -3,9 +3,11 @@ scripts/modification.*
 scripts/*/
 scripts/dataset_builder.py
 scripts/*.ipynb
+scripts/backdoor_analysis_fig_gen.py
 jb_prompts/
 error_log.txt
 elicitor.txt
 *.backup.sql
 *_dataset.json
 pics/*
+.vscode/
