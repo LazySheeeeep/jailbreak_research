@@ -1,19 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import mysql.connector
-import argparse
 
 conn=mysql.connector.connect(host="127.0.0.1", user="root", password="12345678", database="jailbreak_research")
 cursor = conn.cursor()
+model_id=8
+general_condition="ps_id in (1,2,3,6) and mq_id<6"
 
-parser = argparse.ArgumentParser(description="Show result for model")
-parser.add_argument('-mid', '--model-id', type=int, required=True, help="Model id.")
-args = parser.parse_args()
-model_id=args.model_id
-cursor.execute(f"select gguf_name from models where model_id={model_id}")
-model_name = cursor.fetchone()[0]
-
-def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_9, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
+def plot_jt_heatmap(x_labels, y_labels, heatmap_data, baseline_idx, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
     fig, ax = plt.subplots(figsize=(x_size, y_size))
     
     cax = ax.matshow(heatmap_data, cmap='YlGnBu', aspect='auto', vmax=vmax)
@@ -26,10 +20,7 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
             value = heatmap_data[i, j]
             label = f'{value:.0f}' if value.is_integer() else f'{value:.1f}'
             if score == 0 or score == 9:
-                if score == 0:
-                    base = cg_0
-                elif score == 9:
-                    base = cg_9
+                base = heatmap_data[baseline_idx, j]
                 if value > base:
                     label += "↑"
                     if base == 0:
@@ -38,7 +29,10 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
                         decimal = (value - base) / base
                         label += f"{decimal*100:.0f}%"
                 elif value == base:
-                    label += ""
+                    if i == baseline_idx:
+                        label += "*"
+                    else:
+                        label += "="
                 else:
                     label += "↓"
                     decimal = (base - value) / base
@@ -51,7 +45,29 @@ def plot_jt_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0, cg_
     fig.colorbar(cax, location="right", pad=0.15)
     
     #fig.subplots_adjust(left=0.2, right=1.0, top=0.95, bottom=0.11)
-    
+    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
+    base = avg_scores[baseline_idx]
+    avg_and_changes = []
+    for i, value in enumerate(avg_scores):
+        label = f'{value:.2f}'
+        if value > base:
+            label += "↑"
+            if base == 0:
+                label += "∞"
+            else:
+                decimal = (value - base) / base
+                label += f"{decimal*100:.0f}%"
+        elif value == base:
+            if i == baseline_idx:
+                label += "*"
+            else:
+                label += "="
+        else:
+            label += "↓"
+            decimal = (base - value) / base
+            label += f"{decimal*100:.0f}%"
+        avg_and_changes.append(label)
+
     ax2 = ax.twinx()
     ax2.set_ylim(ax.get_ylim())
     ax2.set_yticks(np.arange(len(y_labels)))
@@ -75,7 +91,7 @@ jts=[key[0] for key in cursor.fetchall()]
 
 def jt_jp_by_score(score=0):
     result = {key: 0 for key in jt_jp_tuple_keys}
-    cursor.execute(f"select jt_id, jp_id, count(*) from scoress where model_id={model_id} and score={score} and ps_id!=5 and mq_id>9 group by jt_id, jp_id order by jt_id, jp_id")
+    cursor.execute(f"select jt_id, jp_id, count(*) from scoress where model_id={model_id} and score={score} and {general_condition} group by jt_id, jp_id order by jt_id, jp_id")
     fetch_result = cursor.fetchall()
     if len(fetch_result) == 0 and score != 9 and score != 0:
         return None
@@ -85,7 +101,7 @@ def jt_jp_by_score(score=0):
 
 def jt_by_score(score=0):
     result = {key: 0 for key in jts}
-    cursor.execute(f"select jt, count(*) from scoress join jailbreak_tactics using(jt_id) where model_id={model_id} and score={score} and ps_id!=5 and mq_id>9 group by jt_id order by jt_id")
+    cursor.execute(f"select jt, count(*) from scoress join jailbreak_tactics using(jt_id) where model_id={model_id} and score={score} and {general_condition} group by jt_id order by jt_id")
     fetch_result = cursor.fetchall()
     if len(fetch_result) == 0 and score != 9 and score != 0:
         return None
@@ -96,7 +112,7 @@ def jt_by_score(score=0):
             result[row[0]] = row[1] / 5
     return result
 
-def generate_jt_jp_heatmap(sort_desc=None):
+def generate_jt_jp_heatmap(sort_desc=None, file_name=f"{model_id}_jt_jp.png"):
     all_jt_jp_scores = {}
     x_labels = []
 
@@ -110,28 +126,6 @@ def generate_jt_jp_heatmap(sort_desc=None):
     for idx, score in enumerate(x_labels):
         for idy, key in enumerate(jt_jp_tuple_keys):
             heatmap_data[idy, idx] = all_jt_jp_scores[score][key]
-    
-    cg_0 = all_jt_jp_scores[0][jt_jp_tuple_keys[-1]]
-    cg_9 = all_jt_jp_scores[9][jt_jp_tuple_keys[-1]]
-    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
-    base = avg_scores[-1]
-    avg_changes = []
-    for i, score in enumerate(avg_scores):
-        label = f'{score:.2f}'
-        if score > base:
-            label += "↑"
-            if base == 0:
-                label += "∞"
-            else:
-                decimal = (score - base) / base
-                label += f"{decimal*100:.0f}%"
-        elif score == base:
-            label += "-baseline"
-        else:
-            label += "↓"
-            decimal = (base - score) / base
-            label += f"{decimal*100:.0f}%"
-        avg_changes.append(label)
 
     cursor.execute(f"select jt, jp_id from jailbreak_prompts join jailbreak_tactics using(jt_id) order by jt_id, jp_id")
     y_labels=[]
@@ -145,13 +139,11 @@ def generate_jt_jp_heatmap(sort_desc=None):
     if sort_desc != None:
         heatmap_data = heatmap_data[sorted_indices]
         y_labels = [y_labels[i] for i in sorted_indices]
-        avg_changes = [avg_changes[i] for i in sorted_indices]
-    
-    file_name = f"bd_{model_id}_jt_jp.png"
+        baseline_idx = y_labels.index("None[1]")
 
-    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0=cg_0, cg_9=cg_9, y_title="Jailbreak Tactic[Prompt ID]", save_path=f"./pics/{file_name}")
+    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, baseline_idx=baseline_idx, y_title="Jailbreak Tactic[Prompt ID]", save_path=f"./pics/{file_name}")
 
-def generate_jt_heatmap(sort_desc=None):
+def generate_jt_heatmap(sort_desc=None, file_name=f"{model_id}_jt.png"):
     all_jt_scores = {}
     x_labels = []
 
@@ -161,9 +153,6 @@ def generate_jt_heatmap(sort_desc=None):
             all_jt_scores[score] = result
             x_labels.append(score)
     
-    cg_0 = all_jt_scores[0][jts[-1]]
-    cg_9 = all_jt_scores[9][jts[-1]]
-
     heatmap_data = np.zeros((len(jts), len(x_labels)), dtype=np.float32)
     for idx, score in enumerate(x_labels):
         for idy, key in enumerate(jts):
@@ -178,31 +167,10 @@ def generate_jt_heatmap(sort_desc=None):
         heatmap_data = heatmap_data[sorted_indices]
         y_labels = [y_labels[i] for i in sorted_indices]
     
-    avg_scores = np.dot(heatmap_data, x_labels) / np.sum(heatmap_data, axis=1)
-    baseline_value = avg_scores[y_labels.index('None')]
-    avg_changes = []
-    for i, score in enumerate(avg_scores):
-        label = f'{score:.2f}'
-        if score > baseline_value:
-            label += "↑"
-            if baseline_value == 0:
-                label += "∞"
-            else:
-                decimal = (score - baseline_value) / baseline_value
-                label += f"{decimal*100:.0f}%"
-        elif score == baseline_value:
-            label += "-baseline"
-        else:
-            label += "↓"
-            decimal = (baseline_value - score) / baseline_value
-            label += f"{decimal*100:.0f}%"
-        avg_changes.append(label)
-
+    baseline_idx = y_labels.index('None')
     x_size = len(x_labels) * 2
 
-    file_name = f"bd_{model_id}_jt.png"
-
-    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0=cg_0, cg_9=cg_9, y_title="Jailbreak Tactic", save_path=f"./pics/{file_name}", x_size=x_size if x_size>8 else 8, y_size=5)
+    plot_jt_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, baseline_idx=baseline_idx, y_title="Jailbreak Tactic", save_path=f"./pics/{file_name}", x_size=x_size if x_size>8 else 8, y_size=5)
 
 def plot_ps_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0s, cg_9s, vmax=100, y_title="", x_size=10, y_size=10, save_path=f"./pics/{model_id}???.png"):
     fig, ax = plt.subplots(figsize=(x_size, y_size))
@@ -258,13 +226,13 @@ def plot_ps_heatmap(x_labels, y_labels, heatmap_data, avg_and_changes, cg_0s, cg
     plt.savefig(save_path)
     plt.close()
 
-ps_mq_tuple_keys = [(i, j) for i in range(1, 5) for j in range(11, 16)]  # Notice
-cursor.execute(f"select ps from prohibited_scenarios where ps_id !=5 order by ps_id")
+ps_mq_tuple_keys = [(i, j) for i in list([1, 2, 3, 6]) for j in range(1, 6)]
+cursor.execute(f"select ps from prohibited_scenarios where ps_id in (1,2,3,6) order by ps_id")
 pss=[key[0] for key in cursor.fetchall()]
 
 def ps_mq_by_score(score=0, control_group=False):
     result = {key: 0 for key in ps_mq_tuple_keys}
-    command=f"select ps_id, mq_id, count(*) from scoress where model_id={model_id} and score={score} and ps_id!=5 and mq_id>9 and jt_id"
+    command=f"select ps_id, mq_id, count(*) from scoress where model_id={model_id} and score={score} and {general_condition} and jt_id"
     if not control_group:
         command+="!"
     command+="=6 group by ps_id, mq_id order by ps_id, mq_id"
@@ -282,7 +250,7 @@ def ps_mq_by_score(score=0, control_group=False):
 
 def ps_by_score(score=0, control_group=False):
     result = {key: 0 for key in pss}
-    command=f"select ps, count(*) from scoress join prohibited_scenarios using(ps_id) where model_id={model_id} and score={score} and ps_id!=5 and mq_id>9 and jt_id"
+    command=f"select ps, count(*) from scoress join prohibited_scenarios using(ps_id) where model_id={model_id} and score={score} and {general_condition} and jt_id"
     if not control_group:
         command+="!"
     command+="=6 group by ps_id order by ps_id"
@@ -298,7 +266,7 @@ def ps_by_score(score=0, control_group=False):
             result[row[0]] = row[1] / 6.25
     return result
 
-def generate_ps_mq_heatmap(sort_desc=None):
+def generate_ps_mq_heatmap(sort_desc=None, file_name=f"{model_id}_ps_mq.png"):
     all_ps_mq_scores = {}
     x_labels = []
 
@@ -368,11 +336,9 @@ def generate_ps_mq_heatmap(sort_desc=None):
         cg_0_cloumn = [cg_0_cloumn[i] for i in sorted_indices]
         cg_9_cloumn = [cg_9_cloumn[i] for i in sorted_indices]
 
-    file_name = f"bd_{model_id}_ps_mq.png"
-
     plot_ps_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0s=cg_0_cloumn, cg_9s=cg_9_cloumn, y_title="Prohobited Scenarios[Question ID]", save_path=f"./pics/{file_name}")
 
-def generate_ps_heatmap(sort_desc=None):
+def generate_ps_heatmap(sort_desc=None, file_name=f"{model_id}_ps.png"):
     all_ps_scores = {}
     x_labels = []
 
@@ -440,13 +406,30 @@ def generate_ps_heatmap(sort_desc=None):
         cg_0_cloumn = [cg_0_cloumn[i] for i in sorted_indices]
         cg_9_cloumn = [cg_9_cloumn[i] for i in sorted_indices]
     
-    file_name = f"bd_{model_id}_ps.png"
     x_size = len(x_labels) * 2
 
     plot_ps_heatmap(x_labels=x_labels, y_labels=y_labels, heatmap_data=heatmap_data, avg_and_changes=avg_changes, cg_0s=cg_0_cloumn, cg_9s=cg_9_cloumn, y_title="Prohobited Scenarios", save_path=f"./pics/{file_name}", x_size=x_size if x_size>8 else 8, y_size=5)
 
 if __name__ == "__main__":
-    generate_jt_jp_heatmap(sort_desc=True)
-    generate_jt_heatmap(sort_desc=True)
-    generate_ps_mq_heatmap(sort_desc=True)
-    generate_ps_heatmap(sort_desc=True)
+    # without trigger
+    for i in list([8, 10]):
+        model_id=i
+        cursor.execute(f"select gguf_name from models where model_id={model_id}")
+        model_name = cursor.fetchone()[0]
+        general_condition="ps_id in (1,2,3,6) and mq_id<6"
+        generate_jt_jp_heatmap(sort_desc=True, file_name=f"BD_{i}_jt_jp.png")
+        generate_jt_heatmap(sort_desc=True, file_name=f"BD_{i}_jt.png")
+        generate_ps_mq_heatmap(sort_desc=True, file_name=f"BD_{i}_ps_mq.png")
+        generate_ps_heatmap(sort_desc=True, file_name=f"BD_{i}_ps.png")
+    
+    # with trigger
+    model_id=10
+    i=10
+    cursor.execute(f"select gguf_name from models where model_id={model_id}")
+    model_name = cursor.fetchone()[0]
+    general_condition="ps_id in (1,2,3,6) and mq_id>10"
+    ps_mq_tuple_keys = [(i, j) for i in list([1, 2, 3, 6]) for j in range(11, 16)]
+    generate_jt_jp_heatmap(sort_desc=True, file_name=f"BD_{i}_jt_jp_trg.png")
+    generate_jt_heatmap(sort_desc=True, file_name=f"BD_{i}_jt_trg.png")
+    generate_ps_mq_heatmap(sort_desc=True, file_name=f"BD_{i}_ps_mq_trg.png")
+    generate_ps_heatmap(sort_desc=True, file_name=f"BD_{i}_ps_trg.png")
